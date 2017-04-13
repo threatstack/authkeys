@@ -56,10 +56,10 @@ func main() {
 	// Parse arguments. Old versions of authkeys took 3 arguments, the only
 	// relevent one today is the username so this is a workaround to make
 	// deployment easier for the company that wrote it :)
-	var username string
 	if len(os.Args) != 2 {
 		log.Fatalf("Not enough parameters specified: Need LDAP username.")
 	}
+	username := os.Args[1]
 
 	// Begin initial LDAP TCP connection
 	l, err := ldap.Dial("tcp", fmt.Sprintf("%s:%d", config.LDAPServer, config.LDAPPort))
