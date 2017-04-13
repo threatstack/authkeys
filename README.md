@@ -82,11 +82,14 @@ If you're wondering why this started at version 2.0.0, it's because we've been
 using this tool internally for a while, and we cleaned it up for external
 consumption :)
 
-Version 2.1 added a quicker TCP timeout. You can set this using the
+Version 2.1.0 added a quicker TCP timeout. You can set this using the
 `DialTimeout` attribute.
 
-Version 2.1.1 adds in some kinder error handling for when LDAP returns nothing
-(or when it returns >1 result)
+Version 2.1.1 adds in error handling for when LDAP returns either no entries or
+too many (>1) entries.
+
+Version 2.1.2 removes some superfluous `os.Exit(1)` calls, since `log.Fatalf`
+does that for you.
 
 ## Contribution
 
