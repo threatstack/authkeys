@@ -85,6 +85,9 @@ consumption :)
 Version 2.1 added a quicker TCP timeout. You can set this using the
 `DialTimeout` attribute.
 
+Version 2.1.1 adds in some kinder error handling for when LDAP returns nothing
+(or when it returns >1 result)
+
 ## Contribution
 
 1. Fork
