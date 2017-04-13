@@ -45,6 +45,7 @@ environment variable for testing.
 ```
 {
   "BaseDN": "",
+  "DialTimeout": 5,
   "KeyAttribute": "",
   "LDAPServer": "",
   "LDAPPort": 389,
