@@ -53,17 +53,19 @@ environment variable for testing.
 }
 ```
 
-| Variable        | Type   | Purpose                                                | Possible Value                       |
-|-----------------|--------|--------------------------------------------------------|--------------------------------------|
-| `BaseDN`        | String | Base DN for your LDAP server                           | `dc=spiffy,dc=io`                    |
-| `KeyAttribute`  | String | LDAP Attribute for the SSH key                         | `sshPublicKey`                       |
-| `LDAPServer`    | String | Hostname of your LDAP server                           | `ldap.spiffy.io`                     |
-| `LDAPPort`      | Int    | Port to talk to LDAP on                                | `389`                                |
-| `RootCAFile`    | String | A path to a file full of trusted root CAs [See note 1] | `/etc/ssl/certs/ca-certificates.crt` |
-| `UserAttribute` | String | LDAP Attribute for a User                              | `uid`                                |
+| Variable        | Type   | Purpose                                              | Possible Value                       |
+|-----------------|--------|------------------------------------------------------|--------------------------------------|
+| `BaseDN`        | String | Base DN for your LDAP server                         | `dc=spiffy,dc=io`                    |
+| `DialTimeout`   | Int    | A connection timeout if LDAP isnt reachable [Note 1] | `5`                                  |
+| `KeyAttribute`  | String | LDAP Attribute for the SSH key                       | `sshPublicKey`                       |
+| `LDAPServer`    | String | Hostname of your LDAP server                         | `ldap.spiffy.io`                     |
+| `LDAPPort`      | Int    | Port to talk to LDAP on                              | `389`                                |
+| `RootCAFile`    | String | A path to a file full of trusted root CAs [Note 2]   | `/etc/ssl/certs/ca-certificates.crt` |
+| `UserAttribute` | String | LDAP Attribute for a User                            | `uid`                                |
 
 ### Notes
 
+1. Defaults to 5 seconds
 1. If blank, Go will attempt to use system trust roots.
 
 ## Usage

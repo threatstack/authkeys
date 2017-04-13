@@ -14,11 +14,14 @@ import (
 	"gopkg.in/ldap.v2"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
+	"time"
 )
 
 type AuthkeysConfig struct {
 	BaseDN string
+	DialTimeout int
 	KeyAttribute string
 	LDAPServer string
 	LDAPPort int
@@ -53,19 +56,29 @@ func main() {
 		config = NewConfig(configfile)
 	}
 
-	// Parse arguments. Old versions of authkeys took 3 arguments, the only
-	// relevent one today is the username so this is a workaround to make
-	// deployment easier for the company that wrote it :)
+	// Username should be our only attribute
 	if len(os.Args) != 2 {
-		log.Fatalf("Not enough parameters specified: Need LDAP username.")
+		log.Fatalf("Not enough parameters specified (or too many): just need LDAP username.")
 	}
 	username := os.Args[1]
 
-	// Begin initial LDAP TCP connection
-	l, err := ldap.Dial("tcp", fmt.Sprintf("%s:%d", config.LDAPServer, config.LDAPPort))
+	// Begin initial LDAP TCP connection. The LDAP library does have a Dial
+	// function that does most of what we need -- but its default timeout is 60
+	// seconds, which can be annoying if we're testing something in, say, Vagrant
+	var conntimeout time.Duration
+	if config.DialTimeout != 0 {
+		conntimeout = time.Duration(config.DialTimeout) * time.Second
+	} else {
+		conntimeout = time.Duration(5) * time.Second
+	}
+	server, err := net.DialTimeout("tcp",
+		fmt.Sprintf("%s:%d", config.LDAPServer, config.LDAPPort),
+		conntimeout)
 	if err != nil {
 		log.Fatal(err)
 	}
+	l := ldap.NewConn(server, false)
+	l.Start()
 	defer l.Close()
 
 	// Need a place to store TLS configuration
@@ -74,7 +87,7 @@ func main() {
 		ServerName: config.LDAPServer,
 	}
 
-	// Configure additional trust roots
+	// Configure additional trust roots if necessary
 	if config.RootCAFile != "" {
 		rootCerts := x509.NewCertPool()
 		rootCAFile, err := ioutil.ReadFile(config.RootCAFile)
