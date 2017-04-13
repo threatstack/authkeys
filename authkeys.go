@@ -119,6 +119,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if len(sr.Entries) == 0 {
+		log.Fatalf("No entries returned from LDAP")
+		os.Exit(1)
+	} else if len(sr.Entries) > 1 {
+		log.Fatalf("Too many entries returned from LDAP")
+		os.Exit(1)
+	}
+
 	// Get the keys & print 'em. This will only print keys for the first user
 	// returned from LDAP, but if you have multiple users with the same name maybe
 	// setting a different BaseDN may be useful.
