@@ -4,6 +4,9 @@
 `AuthorizedKeysCommand`. It'll reach out to LDAP and get keys and display them
 on stdout.
 
+To learn more about our use of `authkeys` see our blog post.
+* [Authkeys: Key-Based SSH Authentication with Go](https://blog.threatstack.com/authkeys-making-key-based-ldap-authentication-faster)
+
 ## Pre-Requisites
 
 You'll need an LDAP server that has a
