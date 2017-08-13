@@ -1,7 +1,8 @@
 // authkeys - lookup a user's SSH keys as stored in LDAP
 // authkeys.go: the whole thing.
 //
-// Copyright 2017 Threat Stack, Inc. See LICENSE for license information.
+// Copyright 2017 Threat Stack, Inc.
+// Licensed under the BSD 3-clause license; see LICENSE for more information.
 // Author: Patrick T. Cable II <pat.cable@threatstack.com>
 
 package main
