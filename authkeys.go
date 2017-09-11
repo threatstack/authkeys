@@ -27,6 +27,8 @@ type AuthkeysConfig struct {
 	LDAPPort int
 	RootCAFile string
 	UserAttribute string
+	BindDN string
+	BindPW string
 }
 
 func NewConfig(fname string) AuthkeysConfig {
@@ -104,6 +106,14 @@ func main() {
 	err = l.StartTLS(tlsConfig)
 	if err != nil {
 		log.Fatalf("Unable to start TLS connection: %s", err)
+	}
+
+	// If we have a BindDN go ahead and bind before searching
+	if config.BindDN != "" && config.BindPW != "" {
+		err := l.Bind(config.BindDN, config.BindPW)
+		if err != nil {
+			log.Fatalf("Unable to bind: %s", err)
+		}
 	}
 
 	// Set up an LDAP search and actually do the search
