@@ -17,7 +17,7 @@ import (
 	"net"
 	"os"
 	"time"
-
+	"strings"
 	"gopkg.in/ldap.v2"
 )
 
@@ -31,6 +31,13 @@ type AuthkeysConfig struct {
 	UserAttribute string
 	BindDN        string
 	BindPW        string
+}
+
+type User struct {
+	Uid		string `json:"id"`
+	UidNumber   	string `json:"uid"`
+	MemberOf    	[]string `json:"groups"`
+	HomeDirectory  	string `json:"home"`
 }
 
 func NewConfig(fname string) AuthkeysConfig {
@@ -130,7 +137,7 @@ func main() {
 			config.BaseDN,
 			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 			fmt.Sprintf("(&(objectClass=inetOrgPerson)(memberOf=cn=%s,%s))", *groupPtr, config.BaseDN),
-			[]string{"uid"}, // attributes to retrieve
+			[]string{"uid","uidNumber","memberOf","homeDirectory"}, // attributes to retrieve
 			nil,
 		)
 	} else {
@@ -156,18 +163,37 @@ func main() {
 	}
 
 	var attribute string
+	cn := "cn="
 	if listUsers {
-		attribute = "uid"
+		for _, entry := range sr.Entries {
+			rawMemberOf := entry.GetAttributeValues("memberOf")
+			var memberOf []string
+			for group := range(rawMemberOf) {
+			        cnLoc := strings.Index(rawMemberOf[group], cn)
+				termLoc := strings.Index(rawMemberOf[group], ",")
+				memberOf = append(memberOf, rawMemberOf[group][cnLoc+len(cn):termLoc])
+			}
+			user, err := json.Marshal(User{
+				Uid: string(entry.GetAttributeValue("uid")),
+				UidNumber: string(entry.GetAttributeValue("uidNumber")),
+				MemberOf: memberOf,
+				HomeDirectory: string(entry.GetAttributeValue("homeDirectory")),
+			})
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("%s\n", user)
+		}
 	} else {
 		attribute = config.KeyAttribute
+		for _, entry := range sr.Entries {
+			keys := entry.GetAttributeValues(attribute)
+			for _, key := range keys {
+				fmt.Printf("%s\n", key)
+		        }
+		}
 	}
 	// Get the keys & print 'em. This will only print keys for the first user
 	// returned from LDAP, but if you have multiple users with the same name maybe
 	// setting a different BaseDN may be useful.
-	for _, entry := range sr.Entries {
-		keys := entry.GetAttributeValues(attribute)
-		for _, key := range keys {
-			fmt.Printf("%s\n", key)
-		}
-	}
 }
