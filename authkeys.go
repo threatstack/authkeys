@@ -165,6 +165,7 @@ func main() {
 	var attribute string
 	cn := "cn="
 	if listUsers {
+	var Users []User
 		for _, entry := range sr.Entries {
 			rawMemberOf := entry.GetAttributeValues("memberOf")
 			var memberOf []string
@@ -173,17 +174,18 @@ func main() {
 				termLoc := strings.Index(rawMemberOf[group], ",")
 				memberOf = append(memberOf, rawMemberOf[group][cnLoc+len(cn):termLoc])
 			}
-			user, err := json.Marshal(User{
+			Users = append(Users,User{
 				Uid: string(entry.GetAttributeValue("uid")),
 				UidNumber: string(entry.GetAttributeValue("uidNumber")),
 				MemberOf: memberOf,
 				HomeDirectory: string(entry.GetAttributeValue("homeDirectory")),
 			})
-			if err != nil {
-				log.Fatal(err)
-			}
-			fmt.Printf("%s\n", user)
 		}
+		myUsers, err := json.Marshal(Users)
+		if err != nil {
+			log.Fatal(err)
+		}
+	        fmt.Printf("%s\n", myUsers)
 	} else {
 		attribute = config.KeyAttribute
 		for _, entry := range sr.Entries {
