@@ -11,32 +11,43 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"flag"
 	"fmt"
-	"gopkg.in/ldap.v2"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"time"
+	"strings"
+	"gopkg.in/ldap.v2"
 )
 
 type AuthkeysConfig struct {
-	BaseDN string
-	DialTimeout int
-	KeyAttribute string
-	LDAPServer string
-	LDAPPort int
-	RootCAFile string
+	BaseDN        string
+	DialTimeout   int
+	KeyAttribute  string
+	LDAPServer    string
+	LDAPPort      int
+	RootCAFile    string
 	UserAttribute string
+	BindDN        string
+	BindPW        string
+}
+
+type User struct {
+	Uid		string `json:"id"`
+	UidNumber   	string `json:"uid"`
+	MemberOf    	[]string `json:"groups"`
+	HomeDirectory  	string `json:"home"`
 }
 
 func NewConfig(fname string) AuthkeysConfig {
-	data,err := ioutil.ReadFile(fname)
-	if err != nil{
+	data, err := ioutil.ReadFile(fname)
+	if err != nil {
 		panic(err)
 	}
 	config := AuthkeysConfig{}
-	err = json.Unmarshal(data,&config)
+	err = json.Unmarshal(data, &config)
 	if err != nil {
 		panic(err)
 	}
@@ -57,11 +68,17 @@ func main() {
 		config = NewConfig(configfile)
 	}
 
-	// Username should be our only attribute
-	if len(os.Args) != 2 {
+	groupPtr := flag.String("group", "", "List members of this JumpCloud LDAP group")
+	flag.Parse()
+	listUsers := false
+	username := ""
+	if *groupPtr != "" {
+		listUsers = true
+	} else if len(os.Args) != 2 {
 		log.Fatalf("Not enough parameters specified (or too many): just need LDAP username.")
+	} else {
+		username = os.Args[1]
 	}
-	username := os.Args[1]
 
 	// Begin initial LDAP TCP connection. The LDAP library does have a Dial
 	// function that does most of what we need -- but its default timeout is 60
@@ -85,7 +102,7 @@ func main() {
 	// Need a place to store TLS configuration
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: false,
-		ServerName: config.LDAPServer,
+		ServerName:         config.LDAPServer,
 	}
 
 	// Configure additional trust roots if necessary
@@ -107,14 +124,34 @@ func main() {
 		log.Fatalf("Unable to start TLS connection: %s", err)
 	}
 
-	// Set up an LDAP search and actually do the search
-	searchRequest := ldap.NewSearchRequest(
-		config.BaseDN,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(%s=%s)", config.UserAttribute, username),
-		[]string{config.KeyAttribute},
-		nil,
-	)
+	// If we have a BindDN go ahead and bind before searching
+	if config.BindDN != "" && config.BindPW != "" {
+		err = l.Bind(config.BindDN, config.BindPW)
+		if err != nil {
+			log.Fatalf("Unable to bind: %s", err)
+		}
+	}
+
+	var searchRequest *ldap.SearchRequest
+	if listUsers {
+		searchRequest = ldap.NewSearchRequest(
+			config.BaseDN,
+			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+			fmt.Sprintf("(&(objectClass=inetOrgPerson)(memberOf=cn=%s,%s))", *groupPtr, config.BaseDN),
+			[]string{"uid","uidNumber","memberOf","homeDirectory"}, // attributes to retrieve
+			nil,
+		)
+	} else {
+		// Set up an LDAP search and actually do the search
+		searchRequest = ldap.NewSearchRequest(
+			config.BaseDN,
+			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+			fmt.Sprintf("(%s=%s)", config.UserAttribute, username),
+			[]string{config.KeyAttribute},
+			nil,
+		)
+	}
+
 	sr, err := l.Search(searchRequest)
 	if err != nil {
 		log.Fatal(err)
@@ -122,15 +159,44 @@ func main() {
 
 	if len(sr.Entries) == 0 {
 		log.Fatalf("No entries returned from LDAP")
-	} else if len(sr.Entries) > 1 {
+	} else if !listUsers && (len(sr.Entries) > 1) {
 		log.Fatalf("Too many entries returned from LDAP")
 	}
 
+	var attribute string
+	cn := "cn="
+	if listUsers {
+	var Users []User
+		for _, entry := range sr.Entries {
+			rawMemberOf := entry.GetAttributeValues("memberOf")
+			var memberOf []string
+			for group := range(rawMemberOf) {
+			        cnLoc := strings.Index(rawMemberOf[group], cn)
+				termLoc := strings.Index(rawMemberOf[group], ",")
+				memberOf = append(memberOf, rawMemberOf[group][cnLoc+len(cn):termLoc])
+			}
+			Users = append(Users,User{
+				Uid: string(entry.GetAttributeValue("uid")),
+				UidNumber: string(entry.GetAttributeValue("uidNumber")),
+				MemberOf: memberOf,
+				HomeDirectory: string(entry.GetAttributeValue("homeDirectory")),
+			})
+		}
+		myUsers, err := json.Marshal(Users)
+		if err != nil {
+			log.Fatal(err)
+		}
+	        fmt.Printf("%s\n", myUsers)
+	} else {
+		attribute = config.KeyAttribute
+		for _, entry := range sr.Entries {
+			keys := entry.GetAttributeValues(attribute)
+			for _, key := range keys {
+				fmt.Printf("%s\n", key)
+		        }
+		}
+	}
 	// Get the keys & print 'em. This will only print keys for the first user
 	// returned from LDAP, but if you have multiple users with the same name maybe
 	// setting a different BaseDN may be useful.
-	keys := sr.Entries[0].GetAttributeValues(config.KeyAttribute)
-	for _, key := range keys {
-		fmt.Printf("%s\n", key)
-	}
 }
