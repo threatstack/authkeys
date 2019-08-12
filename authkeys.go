@@ -17,8 +17,9 @@ import (
 	"log"
 	"net"
 	"os"
-	"time"
 	"strings"
+	"time"
+
 	"gopkg.in/ldap.v2"
 )
 
@@ -35,10 +36,10 @@ type AuthkeysConfig struct {
 }
 
 type User struct {
-	Uid		string `json:"id"`
-	UidNumber   	string `json:"uid"`
-	MemberOf    	[]string `json:"groups"`
-	HomeDirectory  	string `json:"home"`
+	Uid           string   `json:"id"`
+	UidNumber     string   `json:"uid"`
+	MemberOf      []string `json:"groups"`
+	HomeDirectory string   `json:"home"`
 }
 
 func NewConfig(fname string) AuthkeysConfig {
@@ -57,6 +58,7 @@ func NewConfig(fname string) AuthkeysConfig {
 func main() {
 	var config AuthkeysConfig
 	var configfile string
+	var attributes []string
 
 	// Get configuration
 	if os.Getenv("AUTHKEYS_CONFIG") == "" {
@@ -68,7 +70,8 @@ func main() {
 		config = NewConfig(configfile)
 	}
 
-	groupPtr := flag.String("group", "", "List members of this JumpCloud LDAP group")
+	groupPtr := flag.String("group", "", "List members of this LDAP group")
+	minPtr := flag.String("min", "", "Use minimal attributes. (For LDAP that does not support memberOf)")
 	flag.Parse()
 	listUsers := false
 	username := ""
@@ -80,6 +83,11 @@ func main() {
 		username = os.Args[1]
 	}
 
+	if *minPtr != "" {
+		attributes = []string{"uid", "uidNumber", "homeDirectory"}
+	} else {
+		attributes = []string{"uid", "uidNumber", "memberOf", "homeDirectory"}
+	}
 	// Begin initial LDAP TCP connection. The LDAP library does have a Dial
 	// function that does most of what we need -- but its default timeout is 60
 	// seconds, which can be annoying if we're testing something in, say, Vagrant
@@ -138,7 +146,7 @@ func main() {
 			config.BaseDN,
 			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 			fmt.Sprintf("(&(objectClass=inetOrgPerson)(memberOf=cn=%s,%s))", *groupPtr, config.BaseDN),
-			[]string{"uid","uidNumber","memberOf","homeDirectory"}, // attributes to retrieve
+			attributes, // attributes to retrieve
 			nil,
 		)
 	} else {
@@ -166,34 +174,50 @@ func main() {
 	var attribute string
 	cn := "cn="
 	if listUsers {
-	var Users []User
+		var Users []User
 		for _, entry := range sr.Entries {
 			rawMemberOf := entry.GetAttributeValues("memberOf")
 			var memberOf []string
-			for group := range(rawMemberOf) {
-			        cnLoc := strings.Index(rawMemberOf[group], cn)
+			var username string
+			for group := range rawMemberOf {
+				cnLoc := strings.Index(rawMemberOf[group], cn)
 				termLoc := strings.Index(rawMemberOf[group], ",")
 				memberOf = append(memberOf, rawMemberOf[group][cnLoc+len(cn):termLoc])
 			}
-			Users = append(Users,User{
-				Uid: string(entry.GetAttributeValue("uid")),
-				UidNumber: string(entry.GetAttributeValue("uidNumber")),
-				MemberOf: memberOf,
-				HomeDirectory: string(entry.GetAttributeValue("homeDirectory")),
+			// Some Idp do not support memberOf from a group listing so lets iterate over the user
+			if len(memberOf) == 0 {
+				memberOf = append(memberOf, *groupPtr)
+			}
+			// If the uid returns an email only use the prefix.
+			if strings.Contains(string(entry.GetAttributeValue("uid")), "@") {
+				email := string(entry.GetAttributeValue("uid"))
+				components := strings.Split(email, "@")
+				username = components[0]
+			} else {
+				username = string(entry.GetAttributeValue("uid"))
+			}
+
+			homeDir := string(entry.GetAttributeValue("homeDirectory"))
+
+			Users = append(Users, User{
+				Uid:           username,
+				UidNumber:     string(entry.GetAttributeValue("uidNumber")),
+				MemberOf:      memberOf,
+				HomeDirectory: homeDir,
 			})
 		}
 		myUsers, err := json.Marshal(Users)
 		if err != nil {
 			log.Fatal(err)
 		}
-	        fmt.Printf("%s\n", myUsers)
+		fmt.Printf("%s\n", myUsers)
 	} else {
 		attribute = config.KeyAttribute
 		for _, entry := range sr.Entries {
 			keys := entry.GetAttributeValues(attribute)
 			for _, key := range keys {
 				fmt.Printf("%s\n", key)
-		        }
+			}
 		}
 	}
 	// Get the keys & print 'em. This will only print keys for the first user
