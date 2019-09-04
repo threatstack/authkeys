@@ -42,6 +42,12 @@ setup -- just using a template and package resource. We leverage the OpenSSH
 cookbook using a `node.override` for the `authorized_keys_command` and
 `authorized_keys_command_user` variables.
 
+Some LDAP installations require you to bind before searching. For example, Jumpcloud
+operates a user directory-as-a-service and allows users to self-service their
+SSH keys. You will need to provide a BindDN and BindPW in order to connect to
+the JumpCloud LDAP directory. See the documentation in this article for details:
+https://jumpcloud.com/engineering-blog/how-to-connect-your-application-to-ldap/
+
 ## Configuration
 
 Authkeys is configured using a JSON file. By default, it'll look in
@@ -57,6 +63,8 @@ environment variable for testing.
   "LDAPPort": 389,
   "RootCAFile": "",
   "UserAttribute": "",
+  "BindDN": "",
+  "BindPW": ""
 }
 ```
 
@@ -69,6 +77,8 @@ environment variable for testing.
 | `LDAPPort`      | Int    | Port to talk to LDAP on                              | `389`                                |
 | `RootCAFile`    | String | A path to a file full of trusted root CAs [Note 2]   | `/etc/ssl/certs/ca-certificates.crt` |
 | `UserAttribute` | String | LDAP Attribute for a User                            | `uid`                                |
+| `BindDN`        | String | Bind DN for your LDAP server (LDAP service account)  | `uid=U,ou=Users,o=123,dc=jc,dc=com`  |
+| `BindPW`        | String | Password for the LDAP service account                | `password`                           |
 
 ### Notes
 
@@ -93,6 +103,9 @@ too many (>1) entries.
 
 Version 2.1.2 removes some superfluous `os.Exit(1)` calls, since `log.Fatalf`
 does that for you.
+
+Version 2.1.3 added support for using a Bind DN for LDAP services such as 
+Jumpcloud.com that require authentication.
 
 ## Contribution
 
