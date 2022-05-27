@@ -1,9 +1,8 @@
 // authkeys - lookup a user's SSH keys as stored in LDAP
 // authkeys.go: the whole thing.
 //
-// Copyright 2017 Threat Stack, Inc.
+// Copyright 2017-2022 F5 Inc.
 // Licensed under the BSD 3-clause license; see LICENSE for more information.
-// Author: Patrick T. Cable II <pat.cable@threatstack.com>
 
 package main
 
@@ -12,33 +11,34 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/ldap.v2"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"time"
+
+	"gopkg.in/ldap.v2"
 )
 
 type AuthkeysConfig struct {
-	BaseDN string
-	DialTimeout int
-	KeyAttribute string
-	LDAPServer string
-	LDAPPort int
-	RootCAFile string
+	BaseDN        string
+	DialTimeout   int
+	KeyAttribute  string
+	LDAPServer    string
+	LDAPPort      int
+	RootCAFile    string
 	UserAttribute string
-	BindDN string
-	BindPW string
+	BindDN        string
+	BindPW        string
 }
 
 func NewConfig(fname string) AuthkeysConfig {
-	data,err := ioutil.ReadFile(fname)
-	if err != nil{
+	data, err := ioutil.ReadFile(fname)
+	if err != nil {
 		panic(err)
 	}
 	config := AuthkeysConfig{}
-	err = json.Unmarshal(data,&config)
+	err = json.Unmarshal(data, &config)
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +87,7 @@ func main() {
 	// Need a place to store TLS configuration
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: false,
-		ServerName: config.LDAPServer,
+		ServerName:         config.LDAPServer,
 	}
 
 	// Configure additional trust roots if necessary
